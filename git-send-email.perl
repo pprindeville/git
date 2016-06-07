@@ -28,7 +28,7 @@ use File::Temp qw/ tempdir tempfile /;
 use File::Spec::Functions qw(catdir catfile);
 use Error qw(:try);
 use Cwd qw(abs_path cwd);
-use Net::SMTP;
+use Net::SMTP 2.34;
 use Git;
 use Git::I18N;
 
@@ -1377,47 +1377,24 @@ EOF
 				$IO::Socket::SSL::DEBUG = 1;
 			}
 
-			# Net::SMTP::SSL->new() does not forward any SSL options
 			IO::Socket::SSL::set_client_defaults(
 				ssl_verify_params());
-
-			if ($use_net_smtp_ssl) {
-				require Net::SMTP::SSL;
-				$smtp ||= Net::SMTP::SSL->new($smtp_server,
-							      Hello => $smtp_domain,
-							      Port => $smtp_server_port,
-							      Debug => $debug_net_smtp);
-			}
-			else {
-				$smtp ||= Net::SMTP->new($smtp_server,
-							 Hello => $smtp_domain,
-							 Port => $smtp_server_port,
-							 Debug => $debug_net_smtp,
-							 SSL => 1);
-			}
+			$smtp = Net::SMTP->new($smtp_server,
+					       Hello => $smtp_domain,
+					       Port => $smtp_server_port,
+					       SSL => 1,
+					       Debug => $debug_net_smtp);
 		}
 		else {
 			$smtp_server_port ||= 25;
-			$smtp_domain ||= maildomain();
-			$smtp ||= Net::SMTP->new($smtp_server,
+			$smtp = Net::SMTP->new($smtp_server,
 						 Hello => $smtp_domain,
 						 Debug => $debug_net_smtp,
 						 Port => $smtp_server_port);
 			if ($smtp_encryption eq 'tls' && $smtp) {
-				if ($use_net_smtp_ssl) {
-					$smtp->command('STARTTLS');
-					$smtp->response();
-					if ($smtp->code != 220) {
-						die sprintf(__("Server does not support STARTTLS! %s"), $smtp->message);
-					}
-					require Net::SMTP::SSL;
-					$smtp = Net::SMTP::SSL->start_SSL($smtp,
-									  ssl_verify_params())
-						or die sprintf(__("STARTTLS failed! %s"), IO::Socket::SSL::errstr());
-				}
-				else {
-					$smtp->starttls(ssl_verify_params())
-						or die sprintf(__("STARTTLS failed! %s"), IO::Socket::SSL::errstr());
+				$smtp->starttls(ssl_verify_params());
+				if ($smtp->code != 250) {
+					die "Server does not support STARTTLS! ".$smtp->message;
 				}
 				$smtp_encryption = '';
 				# Send EHLO again to receive fresh
