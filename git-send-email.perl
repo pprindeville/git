@@ -1369,6 +1369,7 @@ EOF
 
 		if ($smtp_encryption eq 'ssl') {
 			$smtp_server_port ||= 465; # ssmtp
+			$smtp_domain ||= maildomain();
 			require IO::Socket::SSL;
 
 			# Suppress "variable accessed once" warning.
@@ -1377,12 +1378,11 @@ EOF
 				$IO::Socket::SSL::DEBUG = 1;
 			}
 
-			IO::Socket::SSL::set_client_defaults(
-				ssl_verify_params());
 			$smtp = Net::SMTP->new($smtp_server,
 					       Hello => $smtp_domain,
 					       Port => $smtp_server_port,
 					       SSL => 1,
+					       ssl_verify_params(),
 					       Debug => $debug_net_smtp);
 		}
 		else {
